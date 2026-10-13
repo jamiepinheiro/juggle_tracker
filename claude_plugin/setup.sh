@@ -1,8 +1,10 @@
 #!/bin/sh
-# Creates the helper's Python environment (camera, detector, counter) in ./.venv and builds
+# Downloads the ball model (model/ball.onnx links to the repo's model/current release), creates the
+# helper's Python environment (camera, detector, counter) in ./.venv and builds
 # "Juggle Break Camera.app", the app the helper runs inside so macOS can grant it the camera.
 set -e
 cd "$(dirname "$0")"
+../model/fetch.sh
 PY=$(command -v python3.11 || command -v python3.12 || command -v python3.13 || command -v python3)
 "$PY" -m venv .venv
 .venv/bin/pip install --quiet --upgrade pip
