@@ -1,0 +1,13 @@
+{
+  "name": "juggle-tracker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "vendor": "mkdir -p web/vendor && cp node_modules/onnxruntime-web/dist/ort.min.mjs node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.* web/vendor/; ls web/vendor",
+    "serve": "python3 -m http.server 5173 -d web",
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "onnxruntime-web": "1.24.3"
+  }
+}

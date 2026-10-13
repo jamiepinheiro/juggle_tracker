@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Label Juggles</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="label.css">
+</head>
+<body>
+  <header>
+    <h1>Label Juggles <a class="back" href="index.html">Counter</a></h1>
+    <nav class="modes" role="tablist" aria-label="What to label">
+      <button role="tab" id="modeThrows" aria-selected="true">Throws</button>
+      <button role="tab" id="modeBoxes" aria-selected="false">Ball boxes</button>
+    </nav>
+    <div class="controls">
+      <select id="projectVideo" aria-label="Project video" hidden></select>
+      <label class="button primary" for="fileIn" id="openLabel">Open video</label>
+      <input id="fileIn" type="file" accept="video/*" hidden>
+      <span class="saved" id="savedTo"></span>
+      <label class="button" for="importIn">Import labels</label>
+      <input id="importIn" type="file" accept="application/json,.json" hidden>
+      <button id="exportJson">Export JSON</button>
+      <button id="exportCsv">Export CSV</button>
+    </div>
+  </header>
+
+  <main id="throwsMode">
+    <section class="stage">
+      <div class="viewport" id="viewport">
+        <video id="video" playsinline preload="auto"></video>
+        <div class="empty" id="empty">
+          <p><strong>Open or drop a video of yourself juggling.</strong></p>
+          <p>Press <kbd>J</kbd> on every throw as you watch. The first press starts a segment and <kbd>D</kbd> ends it at the drop.
+             Or type a number and press <kbd>Enter</kbd> to set a segment's count.</p>
+          <p>Labels save in this browser for each video file. Open the same file again to pick up where you left off.</p>
+        </div>
+        <div class="hud" id="hud" hidden>
+          <span class="hud-label" id="hudLabel">Segment</span>
+          <span class="hud-count" id="hudCount">0</span>
+        </div>
+        <div class="toast" id="toast" hidden></div>
+      </div>
+
+      <div class="timeline" id="timeline" aria-label="Video timeline" role="slider" tabindex="-1">
+        <div class="segs" id="tlSegs"></div>
+        <div class="ticks mine" id="tlTaps"></div>
+        <div class="ticks model" id="tlModel" hidden></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+      <div class="tl-legend">
+        <span><i class="tk mine"></i>your taps</span>
+        <label><input type="checkbox" id="showModel"> Show the model's throws <kbd>M</kbd></label>
+        <span id="modelLegend" hidden><i class="tk model"></i>model · <i class="tk miss"></i>disagreement · <kbd>X</kbd> next one</span>
+      </div>
+
+      <div class="transport">
+        <button id="playBtn" class="primary" disabled>Play</button>
+        <span class="time"><span id="tNow">0:00.0</span> / <span id="tDur">0:00.0</span></span>
+        <span class="speed">Speed <strong id="speed">1×</strong></span>
+        <span class="file" id="fileName"></span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <dl class="stats">
+        <div><dt>Total juggles</dt><dd id="sumTotal">0</dd></div>
+        <div><dt>Segments</dt><dd id="sumSegs">0</dd></div>
+        <div><dt>Best segment</dt><dd id="sumBest">–</dd></div>
+        <div><dt>Average</dt><dd id="sumAvg">–</dd></div>
+      </dl>
+
+      <h2>Segments</h2>
+      <ol class="seglist" id="segList"></ol>
+      <p class="hint" id="segEmpty">Segments you mark show up here. Click one to jump to it.</p>
+
+      <h2>Shortcuts</h2>
+      <dl class="keys">
+        <div><dt><kbd>Space</kbd> / <kbd>K</kbd></dt><dd>Play / pause</dd></div>
+        <div><dt><kbd>J</kbd> / <kbd>↑</kbd></dt><dd>+1 juggle (starts a segment if none is open)</dd></div>
+        <div><dt><kbd>⇧J</kbd> / <kbd>↓</kbd></dt><dd>−1 juggle</dd></div>
+        <div><dt><kbd>S</kbd></dt><dd>Start a segment here</dd></div>
+        <div><dt><kbd>D</kbd> / <kbd>E</kbd></dt><dd>End the open segment (drop)</dd></div>
+        <div><dt><kbd>0–9</kbd> <kbd>Enter</kbd></dt><dd>Set the segment's count</dd></div>
+        <div><dt><kbd>[</kbd> / <kbd>]</kbd></dt><dd>Move the selected segment's start / end here</dd></div>
+        <div><dt><kbd>←</kbd> / <kbd>→</kbd></dt><dd>Seek 2 s (with <kbd>⇧</kbd>: 10 s)</dd></div>
+        <div><dt><kbd>,</kbd> / <kbd>.</kbd></dt><dd>Step one frame</dd></div>
+        <div><dt><kbd>-</kbd> / <kbd>=</kbd></dt><dd>Slower / faster</dd></div>
+        <div><dt><kbd>P</kbd> / <kbd>N</kbd></dt><dd>Previous / next segment</dd></div>
+        <div><dt><kbd>⌫</kbd></dt><dd>Delete the selected segment</dd></div>
+        <div><dt><kbd>Z</kbd></dt><dd>Undo</dd></div>
+        <div><dt><kbd>M</kbd> / <kbd>X</kbd></dt><dd>Show the model's throws / jump to the next disagreement</dd></div>
+      </dl>
+      <p class="hint">Tap <kbd>J</kbd> when each ball is at the <strong>top of its arc</strong>. That's the moment the counter counts, so the two line up.</p>
+    </aside>
+  </main>
+
+  <main id="boxesMode" class="boxes" hidden>
+    <section class="stage">
+      <div class="viewport bx-viewport" id="bxViewport">
+        <canvas id="bxCanvas" tabindex="0" aria-label="Frame with ball boxes"></canvas>
+        <div class="empty" id="bxEmpty">
+          <p><strong>Ball boxes need the labelling server.</strong></p>
+          <p>Run <kbd>python3 tools/label_server.py</kbd> and open <kbd>http://localhost:5175/label.html</kbd>.
+             It saves straight into <kbd>data/&lt;video&gt;/labels_manual/</kbd>, which training uses ahead of the automatic labels.</p>
+        </div>
+        <div class="toast" id="bxToast" hidden></div>
+      </div>
+      <div class="transport">
+        <button id="bxPrev">← Prev</button>
+        <button id="bxAccept" class="primary">Save &amp; next <kbd>Enter</kbd></button>
+        <button id="bxSkip">Skip <kbd>S</kbd></button>
+        <span class="time" id="bxWhere">–</span>
+        <span class="file" id="bxSource"></span>
+      </div>
+      <div class="strip" id="bxStrip" aria-label="Neighbouring frames"></div>
+    </section>
+
+    <aside class="panel">
+      <dl class="stats">
+        <div><dt>Checked</dt><dd id="bxDone">0</dd></div>
+        <div><dt>In queue</dt><dd id="bxTotal">0</dd></div>
+        <div><dt>This frame</dt><dd id="bxCount">0</dd></div>
+        <div><dt>Frame</dt><dd id="bxFrame">–</dd></div>
+      </dl>
+      <div class="bx-progress"><div id="bxBar"></div></div>
+      <p class="hint" id="bxWhy"></p>
+
+      <h2>What to box</h2>
+      <ul class="rules">
+        <li>Every ball you can see: in the air, in a hand, partly hidden, blurred.</li>
+        <li>Fit the box around the ball, including its blur streak.</li>
+        <li>No balls in view? Save it empty. That teaches the model what <em>isn't</em> a ball.</li>
+        <li>Not sure? Skip. A wrong box hurts more than a missing one.</li>
+      </ul>
+
+      <h2>Shortcuts</h2>
+      <dl class="keys">
+        <div><dt>Click / drag</dt><dd>Add a ball-sized box / draw one</dd></div>
+        <div><dt>Drag box</dt><dd>Move it (corner handles resize)</dd></div>
+        <div><dt>Click dashed</dt><dd>Accept the model's suggestion</dd></div>
+        <div><dt><kbd>A</kbd></dt><dd>Accept all suggestions</dd></div>
+        <div><dt><kbd>⌫</kbd> / right-click</dt><dd>Delete the selected box</dd></div>
+        <div><dt><kbd>C</kbd></dt><dd>Clear all boxes</dd></div>
+        <div><dt><kbd>Enter</kbd> / <kbd>Space</kbd></dt><dd>Save and go to the next queued frame</dd></div>
+        <div><dt><kbd>S</kbd></dt><dd>Skip without saving</dd></div>
+        <div><dt><kbd>,</kbd> / <kbd>.</kbd></dt><dd>Look at the previous / next video frame</dd></div>
+        <div><dt><kbd>H</kbd></dt><dd>Hide boxes to see the ball underneath</dd></div>
+        <div><dt><kbd>Z</kbd></dt><dd>Undo</dd></div>
+      </dl>
+    </aside>
+  </main>
+
+  <script type="module" src="label.js"></script>
+  <script type="module" src="label-boxes.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "subtitle": "Counts every juggling throw",
+  "privacyPolicyUrl": "https://jamiepinheiro.com/privacy",
+  "supportUrl": "https://jamiepinheiro.com",
+  "primaryCategory": "SPORTS",
+  "secondaryCategory": "HEALTH_AND_FITNESS",
+  "copyright": "2026 Jamie Pinheiro",
+  "keywords": "juggling,juggle,counter,beanbag,practice,tracker,cascade,throws,streak,circus,skill",
+  "promotionalText": "Prop up your phone and juggle. Juggle Tracker counts every throw, tracks your longest run and shows your progress, all on your device.",
+  "description": "Juggle Tracker counts your juggling throws live from the camera, so you can practise without keeping count in your head.\n\nProp your iPhone or iPad up so it sees the full height of your throws, tap Start session and juggle. Each throw counts at the top of the ball's arc, and the big number climbs as you go. Drop a ball or pause, and the run ends; your next attempt starts a new one.\n\nWHAT YOU GET\n• Live throw counting, with each ball's path drawn on screen\n• Your last run, best run and personal best at a glance\n• A summary after every session: runs, average and median run, total throws, time juggling and throw rate\n• A chart of every run, so you can see your consistency improve\n• Session history on your device, with export to JSON\n• Count a recorded video from Photos or Files too\n\nPRIVATE BY DESIGN\nBalls are found by a small neural network that runs on your device's Neural Engine. Video never leaves your device, and the app collects no data.\n\nWorks best with small, round, colourful juggling balls or beanbags in a well-lit room.",
+  "reviewNotesFile": "review/app-review-notes.md",
+  "reviewAttachment": "review/juggle-tracker-review-demo.mp4",
+  "screenshots": {
+    "APP_IPHONE_67": "exports/iphone/ios/iphone/1320x2868/en",
+    "APP_IPAD_PRO_3GEN_129": "exports/ipad/ios/ipad/2064x2752/en"
+  }
+}

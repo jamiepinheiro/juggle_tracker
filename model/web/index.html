@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Juggle Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Juggle Tracker</h1>
+    <div class="controls">
+      <button id="camBtn" class="primary">Start camera</button>
+      <label class="button" for="fileIn">Count a video file</label>
+      <input id="fileIn" type="file" accept="video/*" hidden>
+      <button id="stopBtn" hidden>Stop</button>
+      <a class="button" href="inspect.html">Inspect</a>
+      <a class="button" href="label.html">Label a video</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div class="viewport" id="viewport">
+        <canvas id="view"></canvas>
+        <div class="empty" id="empty">
+          <p><strong>Point the camera so your whole throw height is in frame.</strong></p>
+          <p>Every throw is counted at the top of its arc. A run ends when no ball is thrown for 1.5&nbsp;seconds.</p>
+        </div>
+      </div>
+      <div class="statusbar">
+        <span id="status">Loading model…</span>
+        <span class="framing" id="framing" hidden>Throws are leaving the top of the frame and some may be missed. Move the camera back or tilt it up.</span>
+        <span class="settings">
+          <label><input type="checkbox" id="overlay" checked> Show tracking</label>
+          <label><input type="checkbox" id="mirror" checked> Mirror camera</label>
+          <label>Sensitivity <input type="range" id="conf" min="0.15" max="0.7" step="0.05" value="0.35"></label>
+        </span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="now">
+        <span class="label">Current run</span>
+        <span class="big" id="run">0</span>
+      </div>
+      <dl class="stats">
+        <div><dt>Last run</dt><dd id="last">–</dd></div>
+        <div><dt>Best today</dt><dd id="today">–</dd></div>
+        <div><dt>Personal best</dt><dd id="best">–</dd></div>
+        <div><dt>Throws today</dt><dd id="todayTotal">0</dd></div>
+      </dl>
+
+      <h2>Runs today</h2>
+      <svg id="runsChart" class="chart" role="img" aria-label="Throws per run today"></svg>
+      <p class="hint" id="runsEmpty">Runs you finish today show up here.</p>
+
+      <h2>Best run per day</h2>
+      <svg id="daysChart" class="chart" role="img" aria-label="Best run per day"></svg>
+      <p class="hint" id="daysEmpty">Your daily bests build up here over time.</p>
+
+      <button id="clearBtn" class="quiet">Clear history</button>
+    </aside>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

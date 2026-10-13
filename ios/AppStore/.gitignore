@@ -1,0 +1,7 @@
+exports/*.zip
+raw/
+demo-*.mp4
+# Apple's device bezels (Apple Design Resources) are not ours to redistribute; the editor falls back to drawn frames
+screenshots-editor/public/frames/*.png
+# template's own test-rollout notes
+screenshots-editor/docs/testing/

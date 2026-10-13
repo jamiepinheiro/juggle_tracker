@@ -1,0 +1,12 @@
+# Python environment for model/ and data_labelling/ (one venv at the repo root: ../.venv)
+ultralytics==8.4.176
+onnx==1.23.2
+onnxslim==0.1.98
+onnxruntime==1.31.0
+coremltools==9.0
+opencv-python==5.0.0.93
+numpy==2.3.5
+matplotlib==3.11.2
+# experiments/ only
+librosa==0.11.0
+scipy==1.17.1

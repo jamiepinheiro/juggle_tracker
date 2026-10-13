@@ -1,0 +1,5 @@
+{
+  "_doc": "Per-video settings for build_dataset.py, review_queue.py and label_server.py. neg: [start, end) frame ranges with no juggling (auto labels there are junk; treated as no balls). val: [start, end) held-out block. stride: keep every Nth frame for training.",
+  "IMG_0736": {"neg": [[1085, 1000000]], "val": [850, 960], "stride": 1},
+  "IMG_0737": {"neg": [[0, 121], [2200, 2700], [5700, 1000000]], "val": [4500, 4900], "stride": 3}
+}

@@ -1,0 +1,47 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "juggle-tracker",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5173",
+        "-d",
+        "model/web"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "juggle-tracker-alt",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5174",
+        "-d",
+        "model/web"
+      ],
+      "port": 5174
+    },
+    {
+      "name": "label-server",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": [
+        "data_labelling/tools/label_server.py",
+        "5175"
+      ],
+      "port": 5175
+    },
+    {
+      "name": "screenshots-editor",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd ios/AppStore/screenshots-editor && exec ./node_modules/.bin/next dev -p 3100"
+      ],
+      "port": 3100
+    }
+  ]
+}

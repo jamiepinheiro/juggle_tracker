@@ -1,0 +1,19 @@
+.venv/
+node_modules/
+__pycache__/
+.DS_Store
+
+# model: releases live on GitHub (model/fetch.sh); training output, eval dumps and stock weights stay local
+model/releases/
+model/runs/
+model/eval/
+model/pretrained/
+model/web/vendor/
+model/web/samples/
+
+# data_labelling: videos, frames and auto labels stay local; hand-made labels and settings are kept
+data_labelling/data/**
+!data_labelling/data/**/
+!data_labelling/data/videos.json
+!data_labelling/data/*/throws.labels.json
+!data_labelling/data/*/labels_manual/*.txt
