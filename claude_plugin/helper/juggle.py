@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 
 import cv2
@@ -31,6 +32,21 @@ JPEG_QUALITY = 55
 def emit(msg):
     sys.stdout.write(json.dumps(msg, separators=(",", ":")) + "\n")
     sys.stdout.flush()
+
+
+def exit_with(pid):
+    # The plugin stops the helper by stopping the process reading its output (helper/launch.sh).
+    # A write to the abandoned pipe can block rather than fail, so watch that process instead.
+    def watch():
+        while True:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                os._exit(0)
+            except PermissionError:
+                pass
+            time.sleep(0.5)
+    threading.Thread(target=watch, daemon=True).start()
 
 
 def list_cameras():
@@ -144,8 +160,6 @@ def run(camera, video=None):
                     "dets": [[round(d["x"], 4), round(d["y"], 4), round(d["size"], 4)] for d in dets],
                     "tracks": [[[round(x, 4), round(y, 4)] for x, y in tr.trail] for tr in tracks
                                if len(tr.trail) > 1],
-                    "run": counter.run,
-                    "total": counter.total,
                 })
 
 
@@ -153,8 +167,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--camera", type=int, default=0)
+    ap.add_argument("--watch-pid", type=int, help="exit when this process ends")
     ap.add_argument("--video", help="count a video file instead of the camera (for testing)")
     args = ap.parse_args()
+    if args.watch_pid:
+        exit_with(args.watch_pid)
     if args.list:
         list_cameras()
         return 0

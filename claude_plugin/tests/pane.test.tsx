@@ -9,9 +9,8 @@ const PANE = {
 test('the pane shows the scores and settings opens from the cog', async $ => {
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'juggle-break', surface, ...PANE })
-    // The desktop draws the scores as one SVG; the terminal writes them out.
-    expect(await ui.find(surface === 'desktop' ? { key: 'scores' } : { text: /All time best/ })).toBeDefined()
-    expect((await ui.find({ text: /Starts counting/ }))).toBeDefined()
+    expect(await ui.find({ text: /Record/ })).toBeDefined()
+    expect((await ui.find({ text: /next prompt starts/ }))).toBeDefined()
 
     await ui.press({ key: 'cog' })
     expect(await ui.find({ key: 'overlay' })).toBeDefined()
@@ -26,9 +25,9 @@ test('the pane shows the scores and settings opens from the cog', async $ => {
     expect(await ui.find({ key: 'reset' })).toBeDefined()
 
     await ui.press({ key: 'tab-sessions' })
-    expect(await ui.find({ text: /No sessions yet/ })).toBeDefined()
+    expect(await ui.find({ text: /No breaks yet/ })).toBeDefined()
     await ui.press({ key: 'done' })
-    expect(await ui.find({ text: /Starts counting/ })).toBeDefined()
+    expect(await ui.find({ text: /next prompt starts/ })).toBeDefined()
     await ui.unmount()
   }
 })

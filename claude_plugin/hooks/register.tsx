@@ -5,6 +5,7 @@ import type {
   JuggleCamera,
   JuggleFrame,
   JuggleLive,
+  JuggleNotice,
   JugglePhase,
   JuggleSaved,
   JuggleView,
@@ -24,8 +25,7 @@ const live = atom({ plugin: 'juggle-break', key: 'live' } as const, null as Jugg
 const countdown = atom({ plugin: 'juggle-break', key: 'countdown' } as const, 0)
 const saved = atom({ plugin: 'juggle-break', key: 'saved' } as const, EMPTY)
 const cameras = atom({ plugin: 'juggle-break', key: 'cameras' } as const, [] as JuggleCamera[])
-const error = atom({ plugin: 'juggle-break', key: 'error' } as const, null as string | null)
-const waiting = atom({ plugin: 'juggle-break', key: 'waiting' } as const, null as string | null)
+const notice = atom({ plugin: 'juggle-break', key: 'notice' } as const, null as JuggleNotice | null)
 const confirmReset = atom({ plugin: 'juggle-break', key: 'confirmReset' } as const, false)
 
 // The helper child and the countdown timer belong to this load of the module; a reload ends both.
@@ -35,14 +35,20 @@ let ticker: { cancel: () => void } | null = null
 
 type $ = EngineInterface
 
-async function statsPath($: $) {
-  const home = (await $.env.get('HOME')) ?? '~'
-  return `${home}/.juggle-break/stats.json`
+let dirReady: Promise<string> | null = null
+/** ~/.juggle-break, made on first use. */
+function dataDir($: $) {
+  dirReady ??= (async () => {
+    const dir = `${(await $.env.get('HOME')) ?? '~'}/.juggle-break`
+    await $.process.run(['mkdir', '-p', dir]).catch(() => undefined)
+    return dir
+  })()
+  return dirReady
 }
 
 async function load($: $) {
   try {
-    const text = await $.fs.read(await statsPath($))
+    const text = await $.fs.read(`${await dataDir($)}/stats.json`)
     const data = JSON.parse(String(text)) as Partial<JuggleSaved>
     await update($, saved, () => ({
       allTimeBest: data.allTimeBest ?? 0,
@@ -56,9 +62,7 @@ async function load($: $) {
 
 async function persist($: $) {
   try {
-    const path = await statsPath($)
-    await $.process.run(['mkdir', '-p', path.slice(0, path.lastIndexOf('/'))])
-    await $.fs.write(path, JSON.stringify(await read($, saved), null, 2))
+    await $.fs.write(`${await dataDir($)}/stats.json`, JSON.stringify(await read($, saved), null, 2))
   } catch (err) {
     $.ui.toast(`juggle-break: could not save stats (${String(err)})`)
   }
@@ -72,10 +76,7 @@ async function log($: $, text: string, isError = false) {
   if (logLines.length > 200) logLines.shift()
   if (isError) $.ui.toast(`juggle-break: ${text}`)
   try {
-    const path = await statsPath($)
-    const dir = path.slice(0, path.lastIndexOf('/'))
-    await $.process.run(['mkdir', '-p', dir])
-    await $.fs.write(`${dir}/log.txt`, logLines.join('\n') + '\n')
+    await $.fs.write(`${await dataDir($)}/log.txt`, logLines.join('\n') + '\n')
   } catch {
     // nowhere to write; the toast said it
   }
@@ -112,11 +113,10 @@ async function startHelper($: $) {
   await stopHelper()
   const mine = generation
   if (!(await $.fs.exists(python($))) || !(await $.fs.exists(cameraApp($)))) {
-    await update($, error, () => `The camera helper is not set up. Run ${$.plugin.root}/setup.sh once.`)
+    await update($, notice, () => ({ text: `The camera helper is not set up. Run ${$.plugin.root}/setup.sh once.`, isError: true }))
     return
   }
-  await update($, error, () => null)
-  await update($, waiting, () => null)
+  await update($, notice, () => null)
   const { camera } = (await read($, saved)).prefs
   await log($, `starting helper: camera ${camera}, root ${$.plugin.root}`)
   const stream = $.process.spawn({
@@ -145,7 +145,7 @@ async function startHelper($: $) {
       if (mine === generation) await log($, 'helper exited')
     } catch (err) {
       if (mine === generation) {
-        await update($, error, () => `Camera helper failed: ${String(err)}`)
+        await update($, notice, () => ({ text: `Camera helper failed: ${String(err)}`, isError: true }))
         await log($, `helper failed: ${String(err)}`, true)
       }
     }
@@ -178,15 +178,14 @@ async function onMessage($: $, line: string) {
       return
     }
     case 'waiting':
-      await update($, waiting, () => String(msg.message))
-      await log($, `helper waiting: ${String(msg.message)}`)
+      await update($, notice, () => ({ text: String(msg.message), isError: false }))
       return
     case 'ready':
-      await update($, waiting, () => null)
+      await update($, notice, () => null)
       await log($, `helper ready: ${line}`)
       return
     case 'error':
-      await update($, error, () => String(msg.message))
+      await update($, notice, () => ({ text: String(msg.message), isError: true }))
       await log($, `helper error: ${String(msg.message)}`, true)
       return
   }
@@ -236,6 +235,10 @@ async function finish($: $, withCountdown: boolean) {
   await update($, view, () => 'camera')
   await update($, phase, () => 'countdown')
   await update($, countdown, () => COUNTDOWN_S)
+  startTicker($)
+}
+
+function startTicker($: $) {
   cancelCountdown()
   ticker = $.clock.every(1000, () => {
     void (async () => {
@@ -272,11 +275,10 @@ function when(ms: number) {
 // The look of the iOS app: its orange accent, heavy rounded numerals, white text with a shadow
 // over the video, and translucent black chips.
 const ACCENT = '#FF7A45'
-const ACCENT_LIGHT = '#E2531C'
 const FONT = `font-family="ui-rounded, 'SF Pro Rounded', system-ui, sans-serif"`
 const NUM = `${FONT} font-weight="800" style="font-variant-numeric: tabular-nums"`
-const THEMED = `<style>.fg{fill:#f5f5f7}.dim{fill:#98989f}.acc{fill:${ACCENT}}
-@media (prefers-color-scheme: light){.fg{fill:#1c1c1e}.dim{fill:#6e6e73}.acc{fill:${ACCENT_LIGHT}}}</style>`
+const THEMED = `<style>.fg{fill:#f5f5f7}.dim{fill:#98989f}
+@media (prefers-color-scheme: light){.fg{fill:#1c1c1e}.dim{fill:#6e6e73}}</style>`
 const SHADOW = '<filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000" flood-opacity="0.6"/></filter>'
 
 function esc(text: string) {
@@ -288,29 +290,17 @@ function clock(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-/** The score row: big numbers over small labels, the live count in the accent. */
-function scoresSvg(stats: { label: string; value: number; accent?: boolean }[]) {
-  const W = 600
-  const H = 96
-  const col = W / stats.length
-  const cells = stats.map(({ label, value, accent }, i) => {
-    const x = (col * (i + 0.5)).toFixed(0)
-    return `<text x="${x}" y="58" text-anchor="middle" font-size="58" ${NUM} class="${accent ? 'acc' : 'fg'}">${value}</text>` +
-      `<text x="${x}" y="86" text-anchor="middle" font-size="17" ${FONT} font-weight="600" class="dim">${esc(label)}</text>`
-  })
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${THEMED}${cells.join('')}</svg>`
-}
-
 /** One camera frame with the session drawn over it, as the iOS live view does. */
 function frameSvg(f: JuggleFrame, l: JuggleLive | null, overlay: boolean, now: number) {
   const { w, h } = f
   const parts = [`<image href="data:image/jpeg;base64,${f.jpg}" x="0" y="0" width="${w}" height="${h}"/>`]
   if (overlay) {
     for (const trail of f.tracks) {
-      if (trail.length === 0) continue
+      const head = trail.at(-1)
+      if (!head) continue
       const pts = trail.map(([x, y]) => `${(x * w).toFixed(1)},${(y * h).toFixed(1)}`).join(' ')
       parts.push(`<polyline points="${pts}" fill="none" stroke="${ACCENT}" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`)
-      const [x, y] = trail[trail.length - 1]
+      const [x, y] = head
       parts.push(`<circle cx="${(x * w).toFixed(1)}" cy="${(y * h).toFixed(1)}" r="${Math.max(6, h * 0.035).toFixed(1)}" fill="none" stroke="${ACCENT}" stroke-width="2"/>`)
     }
     for (const [x, y, size] of f.dets) {
@@ -319,7 +309,7 @@ function frameSvg(f: JuggleFrame, l: JuggleLive | null, overlay: boolean, now: n
   }
   if (l) {
     // Top left: time, runs, best, throws on a translucent chip.
-    const line2 = `${l.runs} runs · best ${l.sessionBest} · ${l.total} throws`
+    const line2 = `${l.runs} runs · best run ${l.sessionBest} · ${l.total} throws`
     const chipW = Math.min(w - 16, 26 + line2.length * 6.3)
     parts.push(`<rect x="8" y="8" width="${chipW.toFixed(0)}" height="44" rx="7" fill="#000" fill-opacity="0.45"/>`,
       `<text x="17" y="27" font-size="14" ${NUM} fill="#fff">${clock(now - l.startedAt)}</text>`,
@@ -327,7 +317,7 @@ function frameSvg(f: JuggleFrame, l: JuggleLive | null, overlay: boolean, now: n
 
     // Bottom middle: the run being juggled, huge, with a caption; the last run under it between runs.
     const n = l.current
-    const caption = n > 0 ? (l.bestBefore > 0 && n > l.bestBefore ? 'New personal best' : 'this run') : 'Start throwing'
+    const caption = n > 0 ? (l.bestBefore > 0 && n > l.bestBefore ? 'New record' : 'this run') : 'Start throwing'
     const big = h * 0.4
     const lastLine = n === 0 && l.last > 0
     const base = h * (lastLine ? 0.66 : 0.8)
@@ -344,20 +334,20 @@ function frameSvg(f: JuggleFrame, l: JuggleLive | null, overlay: boolean, now: n
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><defs>${SHADOW}</defs>${parts.join('')}</svg>`
 }
 
-/** The end of a session: the seconds left, big, then the session's numbers. */
+/** The end of a session: the seconds left, then the session's numbers, its best run in the middle. */
 function countdownSvg(left: number, s: JuggleSaved, l: JuggleLive | null, now: number) {
   const W = 600
   const H = 300
-  const stat = (x: number, value: number, label: string, accent = false) =>
-    `<text x="${x}" y="236" text-anchor="middle" font-size="52" ${NUM} class="${accent ? 'acc' : 'fg'}">${value}</text>` +
-    `<text x="${x}" y="264" text-anchor="middle" font-size="16" ${FONT} font-weight="600" class="dim">${label}</text>`
+  const stat = (x: number, value: number, label: string, size = 44) =>
+    `<text x="${x}" y="236" text-anchor="middle" font-size="${size}" ${NUM} class="fg">${value}</text>` +
+    `<text x="${x}" y="264" text-anchor="middle" font-size="${size > 44 ? 18 : 16}" ${FONT} font-weight="600" class="dim">${label}</text>`
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${THEMED}` +
-    `<text x="300" y="34" text-anchor="middle" font-size="22" ${FONT} font-weight="600" class="fg">Returning to work in</text>` +
-    `<text x="300" y="150" text-anchor="middle" font-size="120" ${NUM} class="acc">${left}</text>` +
-    stat(100, l?.sessionBest ?? 0, 'Session best', true) +
-    stat(300, l?.total ?? 0, 'Juggles') +
-    stat(500, s.allTimeBest, 'All time best') +
-    `<text x="300" y="292" text-anchor="middle" font-size="15" ${FONT} class="dim">${l?.runs ?? 0} runs · ${minutes(l ? now - l.startedAt : 0)}</text></svg>`
+    `<text x="300" y="34" text-anchor="middle" font-size="22" ${FONT} font-weight="600" class="fg">Back to work in</text>` +
+    `<text x="300" y="150" text-anchor="middle" font-size="120" ${NUM} class="fg">${left}</text>` +
+    stat(110, l?.total ?? 0, 'Throws') +
+    stat(300, l?.sessionBest ?? 0, 'Best run', 72) +
+    stat(490, s.allTimeBest, 'Record') +
+    `<text x="300" y="292" text-anchor="middle" font-size="15" ${FONT} class="dim">${l?.runs ?? 0} runs · ${minutes(l ? now - l.startedAt : 0)} break</text></svg>`
 }
 
 export const register: Register = on => {
@@ -365,18 +355,21 @@ export const register: Register = on => {
     const started = await next(e)
     await load($)
     void listCameras($)
+    // A reload (or restart) keeps the phase but not the helper or the timer: pick the break back up.
+    const p = await read($, phase)
+    if (p === 'countdown') startTicker($)
+    if (p === 'live') void startHelper($).catch(err => log($, `could not restart: ${String(err)}`, true))
     await $.command.register({ name: 'juggle', description: 'Open the juggle break pane' })
     return started
   })
 
   on('command.run', { command: 'juggle' }, async $ => {
     await $.ui.open({ id: PANE, title: TITLE })
-    return { text: 'Juggle break pane opened. It starts counting with your next prompt.' }
+    return { text: 'Juggle break opened. Your next prompt starts the camera.' }
   })
 
   // A prompt starts a juggling session; one folded into a running turn changes nothing.
   on('prompt.submit', async ($, e, next) => {
-    await log($, `prompt.submit (turnId ${e.turnId ?? 'none'})`)
     if (e.turnId === undefined) void begin($).catch(err => log($, `could not start: ${String(err)}`, true))
     return next(e)
   })
@@ -405,152 +398,141 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
+    const Svg = e.surface === 'desktop' || e.surface === 'mobile' ? $.ui.resolve(e).Svg : null
     const p = await read($, phase)
     const v = await read($, view)
     const s = await read($, saved)
     const l = await read($, live)
-    const err = await read($, error)
-    const wait = await read($, waiting)
+    const note = await read($, notice)
+    const f = await read($, frame)
+    const now = Date.now()
 
+    const cog = <Button key="cog" plain label="⚙" onPress={() => void update($, view, cur => (cur === 'camera' ? 'settings' : 'camera'))} />
     const stat = (label: string, value: number, key: string) => (
       <Box key={key} flexDirection="column" alignItems="center" flexGrow={1}>
         <Text bold>{String(value)}</Text>
         <Text dimColor>{label}</Text>
       </Box>
     )
-
-    const drawn = e.surface === 'desktop' || e.surface === 'mobile'
-    const Svg = drawn ? $.ui.resolve(e).Svg : null
-    const current = l?.current ?? 0
-    const scores = Svg ? (
-      <Box key="scores" flexGrow={1}>
-        <Svg
-          source={scoresSvg([
-            { label: 'All time best', value: s.allTimeBest },
-            { label: 'Last', value: l?.last ?? 0 },
-            { label: 'Current', value: current, accent: current > 0 },
-          ])}
-          alt={`All time best ${s.allTimeBest}, last ${l?.last ?? 0}, current ${current}`}
-        />
-      </Box>
-    ) : (
-      [stat('All time best', s.allTimeBest, 'best'), stat('Last', l?.last ?? 0, 'last'), stat('Current', current, 'current')]
-    )
-    const header = (
+    // The scores, where no video carries them: Record, then the runs of this break.
+    const scores = (
       <Box flexDirection="row" alignItems="center" gap={1}>
-        {scores}
-        <Button key="cog" plain label="⚙" onPress={() => void update($, view, cur => (cur === 'camera' ? 'settings' : 'camera'))} />
+        {stat('Record', s.allTimeBest, 'best')}
+        {stat('Last run', l?.last ?? 0, 'last')}
+        {stat('This run', l?.current ?? 0, 'current')}
+        {cog}
       </Box>
     )
 
-    let body
-    if (v === 'settings' || v === 'sessions') {
+    if (v !== 'camera') {
+      const tab = (key: JuggleView, label: string) => (
+        <Button key={`tab-${key}`} variant={v === key ? 'primary' : 'secondary'} label={label} onPress={() => void update($, view, () => key)} />
+      )
       const tabs = (
         <Box flexDirection="row" gap={1}>
-          <Button key="tab-settings" variant={v === 'settings' ? 'primary' : 'secondary'} label="Settings" onPress={() => void update($, view, () => 'settings')} />
-          <Button key="tab-sessions" variant={v === 'sessions' ? 'primary' : 'secondary'} label="Sessions" onPress={() => void update($, view, () => 'sessions')} />
+          {tab('settings', 'Settings')}
+          {tab('sessions', 'History')}
           <Button key="done" label="Done" onPress={() => void update($, view, () => 'camera')} />
         </Box>
       )
-      if (v === 'settings') {
-        const cams = await read($, cameras)
-        const asking = await read($, confirmReset)
-        const options = (cams.length ? cams : [{ index: 0, name: 'Default camera' }]).map(c => ({
-          value: String(c.index),
-          label: c.name,
-        }))
-        const Select = e.surface === 'mobile' ? null : $.ui.resolve(e).Select
-        body = (
-          <Box flexDirection="column" gap={1}>
-            {tabs}
-            {Select ? (
-              <Select
-                key="camera"
-                label="Camera"
-                options={options}
-                value={String(s.prefs.camera)}
-                onSelect={value =>
-                  void (async () => {
-                    await update($, saved, cur => ({ ...cur, prefs: { ...cur.prefs, camera: Number(value) } }))
-                    await persist($)
-                    if ((await read($, phase)) === 'live') await startHelper($)
-                  })()
-                }
-              />
-            ) : (
-              <Text dimColor>Camera {String(s.prefs.camera)}</Text>
-            )}
-            <Button
-              key="overlay"
-              label={`Overlay tracking data: ${s.prefs.overlay ? 'On' : 'Off'}`}
-              onPress={() =>
-                void (async () => {
-                  await update($, saved, cur => ({ ...cur, prefs: { ...cur.prefs, overlay: !cur.prefs.overlay } }))
-                  await persist($)
-                })()
-              }
-            />
-            {asking ? (
-              <Box flexDirection="column">
-                <Text>Reset your all-time best and session history?</Text>
-                <Box flexDirection="row" gap={1}>
-                  <Button key="reset-yes" variant="primary" label="Yes, reset" onPress={() => void resetScores($)} />
-                  <Button key="reset-no" label="Cancel" onPress={() => void update($, confirmReset, () => false)} />
-                </Box>
-              </Box>
-            ) : (
-              <Button key="reset" label="Reset score" onPress={() => void update($, confirmReset, () => true)} />
-            )}
-          </Box>
-        )
-      } else {
+      if (v === 'sessions') {
         const total = s.sessions.reduce((n, x) => n + x.juggles, 0)
-        body = (
+        return (
           <Box flexDirection="column" gap={1}>
             {tabs}
-            <Text dimColor>
-              {`${s.sessions.length} sessions · ${total} juggles in all · best run ${s.allTimeBest}`}
-            </Text>
-            {s.sessions.length === 0 && <Text dimColor>No sessions yet.</Text>}
+            <Text dimColor>{`${s.sessions.length} breaks · ${total} throws · record ${s.allTimeBest}`}</Text>
+            {s.sessions.length === 0 && <Text dimColor>No breaks yet.</Text>}
             <Box flexDirection="column">
               {s.sessions.slice(0, 50).map((x, i) => (
                 <Text key={`s${i}`}>
-                  {`${when(x.startedAt)}  ${x.juggles} juggles · best ${x.best} · ${x.runs} runs · ${minutes(x.endedAt - x.startedAt)}`}
+                  {`${when(x.startedAt)}  best run ${x.best} · ${x.juggles} throws · ${x.runs} runs · ${minutes(x.endedAt - x.startedAt)}`}
                 </Text>
               ))}
             </Box>
           </Box>
         )
       }
-    } else if (p === 'countdown') {
+      const cams = await read($, cameras)
+      const asking = await read($, confirmReset)
+      const Select = e.surface === 'mobile' ? null : $.ui.resolve(e).Select
+      const setPrefs = async (change: Partial<JuggleSaved['prefs']>) => {
+        await update($, saved, cur => ({ ...cur, prefs: { ...cur.prefs, ...change } }))
+        await persist($)
+      }
+      return (
+        <Box flexDirection="column" gap={1}>
+          {tabs}
+          {Select ? (
+            <Select
+              key="camera"
+              label="Camera"
+              options={(cams.length ? cams : [{ index: 0, name: 'Default camera' }]).map(c => ({ value: String(c.index), label: c.name }))}
+              value={String(s.prefs.camera)}
+              onSelect={value =>
+                void (async () => {
+                  await setPrefs({ camera: Number(value) })
+                  if ((await read($, phase)) === 'live') await startHelper($)
+                })()
+              }
+            />
+          ) : (
+            <Text dimColor>{`Camera ${s.prefs.camera}`}</Text>
+          )}
+          <Button key="overlay" label={`Show ball tracking: ${s.prefs.overlay ? 'On' : 'Off'}`} onPress={() => void setPrefs({ overlay: !s.prefs.overlay })} />
+          {asking ? (
+            <Box flexDirection="column">
+              <Text>Clear your record and break history?</Text>
+              <Box flexDirection="row" gap={1}>
+                <Button key="reset-yes" variant="primary" label="Yes, clear" onPress={() => void resetScores($)} />
+                <Button key="reset-no" label="Cancel" onPress={() => void update($, confirmReset, () => false)} />
+              </Box>
+            </Box>
+          ) : (
+            <Button key="reset" label="Clear record and history" onPress={() => void update($, confirmReset, () => true)} />
+          )}
+        </Box>
+      )
+    }
+
+    if (p === 'countdown') {
       const left = await read($, countdown)
-      body = Svg ? (
-        <Svg source={countdownSvg(left, s, l, Date.now())} alt={`Returning to work in ${left}. Session best ${l?.sessionBest ?? 0}, ${l?.total ?? 0} juggles.`} />
+      return Svg ? (
+        <Svg
+          source={countdownSvg(left, s, l, now)}
+          alt={`Back to work in ${left}. Best run ${l?.sessionBest ?? 0}, ${l?.total ?? 0} throws, record ${s.allTimeBest}.`}
+        />
       ) : (
         <Box flexDirection="column" alignItems="center" gap={1} paddingY={1}>
-          <Text bold>{`Returning to work in ${left}...`}</Text>
-          <Box flexDirection="column" alignItems="center">
-            <Text>{`All time best: ${s.allTimeBest}`}</Text>
-            <Text>{`Session best: ${l?.sessionBest ?? 0}`}</Text>
-            <Text>{`Juggles this session: ${l?.total ?? 0}`}</Text>
-            <Text dimColor>{`${l?.runs ?? 0} runs · ${minutes(l ? Date.now() - l.startedAt : 0)}`}</Text>
+          <Text bold>{`Back to work in ${left}…`}</Text>
+          <Text bold>{`Best run: ${l?.sessionBest ?? 0}`}</Text>
+          <Text>{`Throws: ${l?.total ?? 0} · Record: ${s.allTimeBest}`}</Text>
+        </Box>
+      )
+    }
+
+    // Live on the desktop: the video is the scoreboard; under it, the record and settings.
+    if (p === 'live' && e.surface === 'desktop' && Svg && f && !note) {
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Svg source={frameSvg(f, l, s.prefs.overlay, now)} alt={`Camera view, ${l?.current ?? 0} this run`} />
+          <Box flexDirection="row" alignItems="center">
+            <Box flexGrow={1}>
+              <Text dimColor>{`Record ${s.allTimeBest}`}</Text>
+            </Box>
+            {cog}
           </Box>
         </Box>
       )
-    } else if (p === 'live') {
-      const f = await read($, frame)
-      if (err) body = <Text color="error">{err}</Text>
-      else if (!f) body = <Text dimColor>{wait ?? 'Starting the camera…'}</Text>
-      else if (e.surface === 'desktop' && Svg) {
-        body = <Svg source={frameSvg(f, l, s.prefs.overlay, Date.now())} alt={`Camera view, ${current} this run`} />
-      } else body = <Text dimColor>Counting. The camera view shows in the desktop app.</Text>
-    } else {
-      body = <Text dimColor>Starts counting when you send a prompt.</Text>
     }
 
+    let body
+    if (note) body = <Text color={note.isError ? 'error' : undefined} dimColor={!note.isError}>{note.text}</Text>
+    else if (p !== 'live') body = <Text dimColor>Your next prompt starts a juggle break.</Text>
+    else if (e.surface !== 'desktop') body = <Text dimColor>Counting. The camera view shows in the desktop app.</Text>
+    else body = <Text dimColor>Starting the camera…</Text>
     return (
       <Box flexDirection="column" gap={1}>
-        {header}
+        {scores}
         {body}
       </Box>
     )

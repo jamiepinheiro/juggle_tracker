@@ -9,8 +9,8 @@ if [ ! -x "$app/Contents/MacOS/launcher" ]; then
 fi
 fifo=$(mktemp -u "${TMPDIR:-/tmp}/juggle-break.XXXXXX")
 mkfifo "$fifo" || exit 1
-open -W -n -g -a "$app" --stdout "$fifo" --stderr "$root/.helper-stderr.log" --args "$@" &
+open -W -n -g -a "$app" --stdout "$fifo" --stderr "$root/.helper-stderr.log" --args --watch-pid $$ "$@" &
 # The pipe is opened at both ends within moments; remove its name once that has happened.
 (sleep 10; rm -f "$fifo") &
-# Become the reader: when the plugin stops this process the helper's next write fails and it exits.
+# Become the reader. The helper watches this pid (--watch-pid $$) and exits when the plugin stops it.
 exec cat "$fifo"

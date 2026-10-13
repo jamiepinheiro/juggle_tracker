@@ -38,6 +38,9 @@ export type JugglePrefs = { camera: number; overlay: boolean }
 
 export type JuggleCamera = { index: number; name: string }
 
+/** What the pane says in place of the camera: waiting for the permission, or an error. */
+export type JuggleNotice = { text: string; isError: boolean }
+
 /** What is kept on disk, in ~/.juggle-break/stats.json. */
 export type JuggleSaved = {
   allTimeBest: number
@@ -55,9 +58,7 @@ declare module 'claude-code' {
       countdown: number
       saved: JuggleSaved
       cameras: JuggleCamera[]
-      error: string | null
-      /** set while macOS is asking for camera access */
-      waiting: string | null
+      notice: JuggleNotice | null
       confirmReset: boolean
     }
   }
