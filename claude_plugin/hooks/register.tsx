@@ -32,6 +32,13 @@ const confirmReset = atom({ plugin: 'juggle-break', key: 'confirmReset' } as con
 let child: AsyncGenerator<unknown, unknown> | null = null
 let generation = 0
 let ticker: { cancel: () => void } | null = null
+// After Claude's turn ends the break waits this long for the next turn (a queued prompt, or a
+// background result already waiting) before it ends: it ends when the session waits on the user.
+const IDLE_MS = 2000
+let ending: { cancel: () => void } | null = null
+// The turn that started inside that wait, which kept the break going; when it turns out to be a
+// subagent's, the wait starts again.
+let keptBy: string | null = null
 // The cameras that sent no picture this break, so a dead one is skipped rather than retried.
 const deadCameras = new Set<number>()
 
@@ -240,12 +247,26 @@ async function tryNextCamera($: $) {
   return true
 }
 
+function cancelEnding() {
+  ending?.cancel()
+  ending = null
+}
+
+function endWhenIdle($: $) {
+  cancelEnding()
+  ending = $.clock.after(IDLE_MS, () => {
+    ending = null
+    void finish($, true)
+  })
+}
+
 function cancelCountdown() {
   ticker?.cancel()
   ticker = null
 }
 
 async function begin($: $) {
+  cancelEnding()
   cancelCountdown()
   if ((await read($, phase)) !== 'live') {
     deadCameras.clear()
@@ -299,7 +320,7 @@ function startTicker($: $) {
       }
       cancelCountdown()
       await update($, phase, () => 'off')
-      await $.ui.close({ id: PANE })
+      await $.ui.close({ id: PANE }).catch(() => undefined) // already closed by hand
     })()
   })
 }
@@ -450,25 +471,31 @@ export const register: Register = on => {
   })
 
   // A prompt starts a juggling session; one folded into a running turn changes nothing.
+  // A prompt starts a juggling session; one folded into a running turn changes nothing, and a
+  // background task's result or a scheduled prompt starts none (Claude works on, unasked).
   on('prompt.submit', async ($, e, next) => {
-    if (e.turnId === undefined) void begin($).catch(err => log($, `could not start: ${String(err)}`, true))
+    const unasked = e.origin.kind === 'task-notification' || e.origin.kind === 'scheduled-trigger'
+    if (e.turnId === undefined && !unasked) void begin($).catch(err => log($, `could not start: ${String(err)}`, true))
     return next(e)
   })
 
-  // The break lasts while Claude works, background work included: a turn that leaves a command or
-  // agent running in the background ends while Claude is still busy, and that work's result starts
-  // the next turn. Stop says what is still in flight; the break ends once nothing is.
-  on('classic.Stop', async ($, e, next) => {
-    const result = await next(e)
-    if ((e.background_tasks ?? []).length === 0) await finish($, true)
-    return result
-  })
-
-  // An interrupted or failed turn raises no Stop: end the break there.
+  // The break ends when the session waits on the user again: Claude's turn is over and no other
+  // turn follows it at once. Background work still running does not hold it open.
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
-    if (e.agentId === undefined && e.reason !== 'answer') await finish($, true)
+    if (e.agentId === undefined || e.turnId === keptBy) {
+      keptBy = null
+      endWhenIdle($)
+    }
     return done
+  })
+
+  on('turn.start', async ($, e, next) => {
+    if (ending) {
+      cancelEnding()
+      keptBy = e.turnId
+    }
+    return next(e)
   })
 
   // Closing the pane by hand turns the camera off.
