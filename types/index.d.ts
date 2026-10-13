@@ -17,6 +17,8 @@ export type JuggleFrame = {
 /** The juggling session running now (one per prompt). */
 export type JuggleLive = {
   startedAt: number
+  /** the all-time best when the session started, for "New personal best" */
+  bestBefore: number
   current: number
   last: number
   sessionBest: number
@@ -54,6 +56,8 @@ declare module 'claude-code' {
       saved: JuggleSaved
       cameras: JuggleCamera[]
       error: string | null
+      /** set while macOS is asking for camera access */
+      waiting: string | null
       confirmReset: boolean
     }
   }

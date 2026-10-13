@@ -95,7 +95,7 @@ def run(camera, video=None):
     cap = cv2.VideoCapture(video) if video else cv2.VideoCapture(camera, cv2.CAP_AVFOUNDATION)
     if not cap.isOpened():
         emit({"type": "error", "message": f"Could not open camera {camera}. "
-              "Check the camera permission for Claude in System Settings > Privacy & Security > Camera."})
+              "Check that Juggle Break Camera is allowed in System Settings > Privacy & Security > Camera."})
         return 1
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)

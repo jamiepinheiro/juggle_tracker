@@ -18,16 +18,22 @@ Scores and settings live in `~/.juggle-break/stats.json`.
 ./setup.sh
 ```
 
-This creates `.venv` with OpenCV and onnxruntime for the camera helper. Then load the plugin from
+This creates `.venv` with OpenCV and onnxruntime for the camera helper and builds
+`Juggle Break Camera.app`, a small app the helper runs inside. Then load the plugin from
 this folder, e.g. add its path to `CLAUDE_CODE_PLUGIN_DIRS` in the `env` block of
 `~/.claude/settings.json`, or run `claude --plugin-dir <this folder>`.
 
-The first time the camera opens, macOS asks for camera access for Claude.
+The first time the camera opens, macOS asks whether **Juggle Break Camera** may use the camera
+(the pane says it is waiting). Your answer is remembered, and the app is listed under
+System Settings > Privacy & Security > Camera. The helper can't ask as Claude Code: that app
+declares no camera use, so macOS silently refuses anything it starts.
 
 ## How it works
 
 - `hooks/register.tsx`: the plugin. `prompt.submit` starts a session and opens the pane,
   `turn.complete` ends it and runs the countdown. The pane draws each camera frame as an SVG.
+- `helper/launch.sh` and `camera-app/`: open the helper inside Juggle Break Camera.app and pipe
+  its output back. The app's launcher waits for the camera permission, then runs `juggle.py`.
 - `helper/juggle.py`: reads the camera, runs the ball detector, counts throws, and streams
   JSON lines (frames ~10/s as small JPEGs, throws, run ends) to the plugin.
   `--list` prints the cameras; `--video FILE` counts a video file (for testing).

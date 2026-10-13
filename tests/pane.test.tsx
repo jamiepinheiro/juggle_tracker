@@ -9,7 +9,8 @@ const PANE = {
 test('the pane shows the scores and settings opens from the cog', async $ => {
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'juggle-break', surface, ...PANE })
-    expect((await ui.find({ text: /All time best/ }))).toBeDefined()
+    // The desktop draws the scores as one SVG; the terminal writes them out.
+    expect(await ui.find(surface === 'desktop' ? { key: 'scores' } : { text: /All time best/ })).toBeDefined()
     expect((await ui.find({ text: /Starts counting/ }))).toBeDefined()
 
     await ui.press({ key: 'cog' })
