@@ -50,3 +50,7 @@ Then follow the README of the part you want.
 
 The training videos, extracted frames and auto labels are not in the repo. The hand-made labels
 are: ball boxes in `labels_manual/` and throw taps in `throws.labels.json`.
+
+## License
+
+[AGPL-3.0](LICENSE). The detector is trained and exported with [Ultralytics](https://github.com/ultralytics/ultralytics), which is AGPL-3.0.
