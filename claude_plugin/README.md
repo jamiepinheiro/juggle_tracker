@@ -1,10 +1,11 @@
 # juggle-break
 
 ```
-/plugin install juggle-break --marketplace jamiepinheiro/juggle_tracker
+/plugin marketplace add jamiepinheiro/juggle_tracker
+/plugin install juggle-break@juggle-tracker
 ```
 
-Run it in `claude` in a terminal; see [Install](#install).
+Run these in `claude` in a terminal; see [Install](#install).
 
 A Claude Code plugin for the desktop app: juggle while Claude works.
 
@@ -28,12 +29,14 @@ Scores and settings live in `~/.juggle-break/stats.json`. The helper's log is at
 In a terminal, run `claude`, then:
 
 ```
-/plugin install juggle-break --marketplace jamiepinheiro/juggle_tracker
+/plugin marketplace add jamiepinheiro/juggle_tracker
+/plugin install juggle-break@juggle-tracker
 ```
 
-Answer `y` to add the marketplace and pick the user scope. The plugin then loads in every session,
-the desktop app's included (restart the app if it is open). `/plugin install` is a terminal command;
-the desktop app's Code tab doesn't offer it.
+The first line adds this repo as a plugin marketplace; the second installs the plugin from it.
+Pick the user scope. The plugin then loads in every session, the desktop app's included (restart
+the app if it is open). `/plugin` is a terminal command; the desktop app's Code tab doesn't offer
+it.
 
 The first break sets the camera helper up by itself, in a minute or so: the pane says
 "Setting up the camera" while it downloads the ball model, creates a Python environment with
