@@ -49,6 +49,17 @@ def exit_with(pid):
     threading.Thread(target=watch, daemon=True).start()
 
 
+def give_up_unless(started, seconds, camera):
+    # A camera that is there but unavailable (a closed laptop lid, a phone asleep) can block
+    # forever in open or read, so the first frame gets a deadline.
+    def watch():
+        if not started.wait(seconds):
+            emit({"type": "error", "code": "no_picture",
+                  "message": f"Camera {camera} sent no picture. Pick another camera in settings (⚙)."})
+            os._exit(1)
+    threading.Thread(target=watch, daemon=True).start()
+
+
 def list_cameras():
     # OpenCV's AVFoundation backend numbers devices in the order system_profiler lists them.
     names = []
@@ -108,6 +119,9 @@ def _iou(a, b):
 
 def run(camera, video=None):
     detector = Detector(MODEL)
+    started = threading.Event()
+    if not video:
+        give_up_unless(started, 8, camera)
     cap = cv2.VideoCapture(video) if video else cv2.VideoCapture(camera, cv2.CAP_AVFOUNDATION)
     if not cap.isOpened():
         emit({"type": "error", "message": f"Could not open camera {camera}. "
@@ -142,6 +156,7 @@ def run(camera, video=None):
         if not ready:
             emit({"type": "ready", "camera": camera, "w": frame.shape[1], "h": frame.shape[0]})
             ready = True
+            started.set()
 
         dets = detector.detect(frame)
         tracks = counter.update(dets, t)

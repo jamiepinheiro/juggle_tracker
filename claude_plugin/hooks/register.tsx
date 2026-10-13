@@ -32,6 +32,8 @@ const confirmReset = atom({ plugin: 'juggle-break', key: 'confirmReset' } as con
 let child: AsyncGenerator<unknown, unknown> | null = null
 let generation = 0
 let ticker: { cancel: () => void } | null = null
+// The cameras that sent no picture this break, so a dead one is skipped rather than retried.
+const deadCameras = new Set<number>()
 
 type $ = EngineInterface
 
@@ -185,10 +187,26 @@ async function onMessage($: $, line: string) {
       await log($, `helper ready: ${line}`)
       return
     case 'error':
+      if (msg.code === 'no_picture' && (await tryNextCamera($))) return
       await update($, notice, () => ({ text: String(msg.message), isError: true }))
       await log($, `helper error: ${String(msg.message)}`, true)
       return
   }
+}
+
+/** After a camera sent no picture: switch to one not yet tried this break, and keep it as the choice. */
+async function tryNextCamera($: $) {
+  const { camera } = (await read($, saved)).prefs
+  deadCameras.add(camera)
+  const all = await read($, cameras)
+  const next = all.find(c => !deadCameras.has(c.index))
+  if (!next) return false
+  await log($, `camera ${camera} sent no picture; trying ${next.index} (${next.name})`)
+  await update($, saved, cur => ({ ...cur, prefs: { ...cur.prefs, camera: next.index } }))
+  await persist($)
+  await startHelper($)
+  await update($, notice, () => ({ text: `Camera ${camera} sent no picture. Trying ${next.name}…`, isError: false }))
+  return true
 }
 
 function cancelCountdown() {
@@ -199,6 +217,7 @@ function cancelCountdown() {
 async function begin($: $) {
   cancelCountdown()
   if ((await read($, phase)) !== 'live') {
+    deadCameras.clear()
     const now = await $.clock.now()
     const bestBefore = (await read($, saved)).allTimeBest
     await update($, live, () => ({ startedAt: now, bestBefore, current: 0, last: 0, sessionBest: 0, total: 0, runs: 0 }))
@@ -337,6 +356,32 @@ function frameSvg(f: JuggleFrame, l: JuggleLive | null, overlay: boolean, now: n
     parts.push(`<g filter="url(#sh)">${g.join('')}</g>`)
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><defs>${SHADOW}</defs>${parts.join('')}</svg>`
+}
+
+/** The video's place before the first frame: black, with a spinner while loading, or a message. */
+function screenSvg(spinner: boolean, text: string | null, isError = false) {
+  const w = 360
+  const h = 203
+  const parts = [`<rect width="${w}" height="${h}" fill="#000"/>`]
+  const cy = text && spinner ? h / 2 - 12 : h / 2
+  if (spinner) {
+    parts.push(`<circle cx="${w / 2}" cy="${cy}" r="14" fill="none" stroke="#fff" stroke-opacity="0.2" stroke-width="3"/>`,
+      `<path d="M ${w / 2} ${cy - 14} a 14 14 0 0 1 14 14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round">` +
+      `<animateTransform attributeName="transform" type="rotate" from="0 ${w / 2} ${cy}" to="360 ${w / 2} ${cy}" dur="0.9s" repeatCount="indefinite"/></path>`)
+  }
+  if (text) {
+    // Wrap at about 52 characters a line.
+    const lines: string[] = []
+    for (const word of text.split(' ')) {
+      const last = lines.at(-1)
+      if (last !== undefined && last.length + word.length < 52) lines[lines.length - 1] = `${last} ${word}`
+      else lines.push(word)
+    }
+    const top = spinner ? cy + 34 : h / 2 - ((lines.length - 1) * 15) / 2 + 4
+    parts.push(...lines.map((line, i) =>
+      `<text x="${w / 2}" y="${top + i * 15}" text-anchor="middle" font-size="11.5" ${FONT} fill="${isError ? '#ff8a80' : '#c7c7cc'}">${esc(line)}</text>`))
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${parts.join('')}</svg>`
 }
 
 /** The end of a session: the seconds left, then the session's numbers, its best run in the middle. */
@@ -515,11 +560,23 @@ export const register: Register = on => {
       )
     }
 
-    // Live on the desktop: the video is the scoreboard; under it, the record and settings.
-    if (p === 'live' && e.surface === 'desktop' && Svg && f && !note) {
+    // The desktop: the video is the scoreboard (black with a spinner until it starts); under it,
+    // the record and settings.
+    if (e.surface === 'desktop' && Svg) {
+      const live = p === 'live'
+      const screen =
+        live && f && !note ? (
+          <Svg source={frameSvg(f, l, s.prefs.overlay, now)} alt={`Camera view, ${l?.current ?? 0} this run`} />
+        ) : note ? (
+          <Svg source={screenSvg(live && !note.isError, note.text, note.isError)} alt={note.text} isInteractive={live && !note.isError} />
+        ) : live ? (
+          <Svg source={screenSvg(true, null)} alt="Starting the camera" isInteractive />
+        ) : (
+          <Svg source={screenSvg(false, 'Your next prompt starts a juggle break.')} alt="Your next prompt starts a juggle break." />
+        )
       return (
         <Box flexDirection="column" gap={1}>
-          <Svg source={frameSvg(f, l, s.prefs.overlay, now)} alt={`Camera view, ${l?.current ?? 0} this run`} />
+          {screen}
           <Box flexDirection="row" alignItems="center">
             <Box flexGrow={1}>
               <Text dimColor>{`Record ${s.allTimeBest}`}</Text>
@@ -533,8 +590,7 @@ export const register: Register = on => {
     let body
     if (note) body = <Text color={note.isError ? 'error' : undefined} dimColor={!note.isError}>{note.text}</Text>
     else if (p !== 'live') body = <Text dimColor>Your next prompt starts a juggle break.</Text>
-    else if (e.surface !== 'desktop') body = <Text dimColor>Counting. The camera view shows in the desktop app.</Text>
-    else body = <Text dimColor>Starting the camera…</Text>
+    else body = <Text dimColor>Counting. The camera view shows in the desktop app.</Text>
     return (
       <Box flexDirection="column" gap={1}>
         {scores}
