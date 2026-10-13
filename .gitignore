@@ -17,3 +17,7 @@ data_labelling/data/**
 !data_labelling/data/videos.json
 !data_labelling/data/*/throws.labels.json
 !data_labelling/data/*/labels_manual/*.txt
+
+# Claude Code runtime files (keep the shared dev-server config)
+.claude/*
+!.claude/launch.json
