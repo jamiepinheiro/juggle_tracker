@@ -1,5 +1,7 @@
 # Juggle Tracker
 
+<p align="center"><img src=".github/juggling.jpg" width="320" alt="Juggling three balls; the app circles each detected ball, traces its arc, and shows the throw count for this run (13)"></p>
+
 Counts juggling throws from a camera. A small YOLO11n detector finds the balls in each frame. A
 tracker follows each ball and counts one throw at the top of every arc. A run ends when the throws
 stop.
