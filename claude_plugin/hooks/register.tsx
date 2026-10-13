@@ -261,6 +261,11 @@ async function resetScores($: $) {
   await persist($)
 }
 
+/** "1 run", "2 runs". */
+function count(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? '' : 's'}`
+}
+
 function minutes(ms: number) {
   const s = Math.max(0, Math.round(ms / 1000))
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
@@ -309,7 +314,7 @@ function frameSvg(f: JuggleFrame, l: JuggleLive | null, overlay: boolean, now: n
   }
   if (l) {
     // Top left: time, runs, best, throws on a translucent chip.
-    const line2 = `${l.runs} runs · best run ${l.sessionBest} · ${l.total} throws`
+    const line2 = `${count(l.runs, 'run')} · best run ${l.sessionBest} · ${count(l.total, 'throw')}`
     const chipW = Math.min(w - 16, 26 + line2.length * 6.3)
     parts.push(`<rect x="8" y="8" width="${chipW.toFixed(0)}" height="44" rx="7" fill="#000" fill-opacity="0.45"/>`,
       `<text x="17" y="27" font-size="14" ${NUM} fill="#fff">${clock(now - l.startedAt)}</text>`,
@@ -347,7 +352,7 @@ function countdownSvg(left: number, s: JuggleSaved, l: JuggleLive | null, now: n
     stat(110, l?.total ?? 0, 'Throws') +
     stat(300, l?.sessionBest ?? 0, 'Best run', 72) +
     stat(490, s.allTimeBest, 'Record') +
-    `<text x="300" y="292" text-anchor="middle" font-size="15" ${FONT} class="dim">${l?.runs ?? 0} runs · ${minutes(l ? now - l.startedAt : 0)} break</text></svg>`
+    `<text x="300" y="292" text-anchor="middle" font-size="15" ${FONT} class="dim">${count(l?.runs ?? 0, 'run')} · ${minutes(l ? now - l.startedAt : 0)} break</text></svg>`
 }
 
 export const register: Register = on => {
@@ -440,12 +445,12 @@ export const register: Register = on => {
         return (
           <Box flexDirection="column" gap={1}>
             {tabs}
-            <Text dimColor>{`${s.sessions.length} breaks · ${total} throws · record ${s.allTimeBest}`}</Text>
+            <Text dimColor>{`${count(s.sessions.length, 'break')} · ${count(total, 'throw')} · record ${s.allTimeBest}`}</Text>
             {s.sessions.length === 0 && <Text dimColor>No breaks yet.</Text>}
             <Box flexDirection="column">
               {s.sessions.slice(0, 50).map((x, i) => (
                 <Text key={`s${i}`}>
-                  {`${when(x.startedAt)}  best run ${x.best} · ${x.juggles} throws · ${x.runs} runs · ${minutes(x.endedAt - x.startedAt)}`}
+                  {`${when(x.startedAt)}  best run ${x.best} · ${count(x.juggles, 'throw')} · ${count(x.runs, 'run')} · ${minutes(x.endedAt - x.startedAt)}`}
                 </Text>
               ))}
             </Box>
@@ -499,7 +504,7 @@ export const register: Register = on => {
       return Svg ? (
         <Svg
           source={countdownSvg(left, s, l, now)}
-          alt={`Back to work in ${left}. Best run ${l?.sessionBest ?? 0}, ${l?.total ?? 0} throws, record ${s.allTimeBest}.`}
+          alt={`Back to work in ${left}. Best run ${l?.sessionBest ?? 0}, ${count(l?.total ?? 0, 'throw')}, record ${s.allTimeBest}.`}
         />
       ) : (
         <Box flexDirection="column" alignItems="center" gap={1} paddingY={1}>
