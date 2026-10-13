@@ -2,11 +2,14 @@
 
 A Claude Code plugin for the desktop app: juggle while Claude works.
 
+![The Juggle break pane: the camera mid-run with a count of 8 and the balls' trails, and the
+end-of-break summary counting down to work](screenshot.png)
+
 - Send a prompt and a **Juggle break** pane opens with your camera and counts your throws.
 - The video shows **this run** big, your **last run** between runs, and the break's time, runs,
-  best run and throws. Your **record** sits under it.
+  best run and throws.
 - When Claude finishes, the camera turns off and the pane counts down "Back to work in 5", with
-  the break's **best run**, throws and your record, then closes.
+  the break's **best run** (in orange), throws and your all-time **record**, then closes.
 - The ⚙ button opens settings: pick the camera, **Show ball tracking**, **Clear record and
   history**, and a **History** tab listing every break.
 - `/juggle` opens the pane by hand.
