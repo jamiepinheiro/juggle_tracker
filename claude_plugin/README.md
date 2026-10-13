@@ -1,5 +1,11 @@
 # juggle-break
 
+```
+/plugin install juggle-break --marketplace jamiepinheiro/juggle_tracker
+```
+
+Run it in `claude` in a terminal; see [Install](#install).
+
 A Claude Code plugin for the desktop app: juggle while Claude works.
 
 ![The Juggle break pane: the camera mid-run with a count of 8 and the balls' trails, and the
