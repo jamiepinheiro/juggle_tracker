@@ -1,0 +1,9 @@
+{
+  "name": "juggle-break",
+  "version": "0.1.0",
+  "description": "Juggle while Claude works: a camera pane that counts your juggles, keeps your high scores, and sends you back to work when the turn ends.",
+  "author": {
+    "name": "Jamie Pinheiro"
+  },
+  "types": "./types/index.d.ts"
+}
