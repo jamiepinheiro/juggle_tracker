@@ -29,7 +29,7 @@ Every model is a GitHub release named `model-<version>` with three assets:
 
 ```bash
 model/fetch.sh            # download the release model/current points to (or: model/fetch.sh r3)
-model/release.sh r4 runs/r4/weights/best.pt   # export + upload model-r4, point current at it
+model/release.sh r4 model/runs/r4/weights/best.pt   # export + upload model-r4, point current at it
 ```
 
 `fetch.sh` reads the repo from the `origin` remote, or from `JUGGLE_REPO=<owner>/<repo>`.

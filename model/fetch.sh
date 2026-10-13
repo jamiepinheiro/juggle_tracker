@@ -16,9 +16,15 @@ if [ -z "$repo" ]; then
   echo "fetch.sh: no GitHub remote to download from. Set JUGGLE_REPO=<owner>/<repo>." >&2
   exit 1
 fi
-mkdir -p "$dir"
+# download to a scratch folder and move it into place only once everything has arrived
+mkdir -p releases
+tmp=$(mktemp -d "releases/.fetch-$ver.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
 for f in ball.onnx BallModel.mlpackage.zip ball.pt; do
-  curl -fL --progress-bar -o "$dir/$f" "https://github.com/$repo/releases/download/model-$ver/$f"
+  curl -fL --progress-bar -o "$tmp/$f" "https://github.com/$repo/releases/download/model-$ver/$f"
 done
-(cd "$dir" && rm -rf BallModel.mlpackage && unzip -q BallModel.mlpackage.zip && rm BallModel.mlpackage.zip)
+(cd "$tmp" && unzip -q BallModel.mlpackage.zip && rm BallModel.mlpackage.zip)
+rm -rf "$dir"
+mv "$tmp" "$dir"
+trap - EXIT
 echo "model $ver -> model/$dir"

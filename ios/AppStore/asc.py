@@ -3,6 +3,9 @@
 Uses the team API key in ~/.appstoreconnect/private_keys (key ID and issuer below).
   python asc.py status        # what's on App Store Connect now
   python asc.py apply         # push listing.json (text, URLs, review notes, screenshots, ...)
+  python asc.py attach-build  # attach the newest processed build to the version being prepared
+  python asc.py submit        # send that version to App Review
+  python asc.py review-status # version and review submission states
 """
 import json, sys, time, hashlib, pathlib
 import jwt, requests
@@ -157,6 +160,26 @@ def pricing():
          "included": inc})
     print(f"availability: {len(territories)} territories")
 
+def submit():
+    """Send the version that's being prepared to App Review."""
+    aid = app()["id"]
+    version = next(v for v in call("GET", f"/apps/{aid}/appStoreVersions")["data"]
+                   if v["attributes"]["appStoreState"] in ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED"))
+    sub = call("POST", "/reviewSubmissions", {"data": {"type": "reviewSubmissions", "attributes": {"platform": "IOS"},
+               "relationships": {"app": {"data": {"type": "apps", "id": aid}}}}})["data"]
+    call("POST", "/reviewSubmissionItems", {"data": {"type": "reviewSubmissionItems", "relationships": {
+         "reviewSubmission": {"data": {"type": "reviewSubmissions", "id": sub["id"]}},
+         "appStoreVersion": {"data": {"type": "appStoreVersions", "id": version["id"]}}}}})
+    call("PATCH", f"/reviewSubmissions/{sub['id']}", {"data": {"type": "reviewSubmissions", "id": sub["id"], "attributes": {"submitted": True}}})
+    print("submitted", version["attributes"]["versionString"], "submission", sub["id"])
+
+def review_status():
+    aid = app()["id"]
+    for v in call("GET", f"/apps/{aid}/appStoreVersions")["data"]:
+        print("version", v["attributes"]["versionString"], v["attributes"]["appStoreState"])
+    for sub in call("GET", "/reviewSubmissions", **{"filter[app]": aid})["data"]:
+        print("submission", sub["id"], sub["attributes"]["state"], sub["attributes"].get("submittedDate"))
+
 def attach_build():
     a = app(); aid = a["id"]
     builds = call("GET", "/builds", **{"filter[app]": aid, "sort": "-uploadedDate"})["data"]
@@ -169,4 +192,4 @@ def attach_build():
     print("attached build", valid[0]["attributes"]["version"])
 
 if __name__ == "__main__":
-    {"status": status, "apply": apply, "attach-build": attach_build, "pricing": pricing}[sys.argv[1]]()
+    {"status": status, "apply": apply, "attach-build": attach_build, "pricing": pricing, "submit": submit, "review-status": review_status}[sys.argv[1]]()

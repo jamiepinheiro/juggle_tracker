@@ -2,12 +2,14 @@
 # Publishes a model release: exports the weights to ONNX (browser, Claude plugin) and Core ML (iOS)
 # in model/releases/<version>/, uploads them as the GitHub release model-<version>, and points
 # model/current at it. Commit the model/current change so everyone builds against the new model.
-# usage: model/release.sh <version> [weights.pt]   e.g. model/release.sh r4 runs/r4/weights/best.pt
+# usage: model/release.sh <version> [weights.pt]   e.g. model/release.sh r4 model/runs/r4/weights/best.pt
 #        (leave out the weights to upload a release that is already exported, e.g. r3)
 set -e
-cd "$(dirname "$0")"
 ver=$1
 weights=$2
+# the weights path is relative to where this was run from
+[ -z "$weights" ] || weights=$(cd "$(dirname "$weights")" && pwd)/$(basename "$weights")
+cd "$(dirname "$0")"
 dir=releases/$ver
 PY=${PY:-../.venv/bin/python}
 if [ -z "$ver" ]; then
