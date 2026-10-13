@@ -1,0 +1,15 @@
+{
+  "name": "juggle-tracker",
+  "owner": {
+    "name": "Jamie Pinheiro"
+  },
+  "metadata": {
+    "description": "Juggle Tracker's Claude Code plugins: juggle-break counts your juggles while Claude works."
+  },
+  "plugins": [
+    {
+      "name": "juggle-break",
+      "source": "./claude_plugin"
+    }
+  ]
+}

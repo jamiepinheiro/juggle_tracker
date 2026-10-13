@@ -19,52 +19,32 @@ Scores and settings live in `~/.juggle-break/stats.json`. The helper's log is at
 
 ## Install
 
-You need:
+In a terminal, run `claude`, then:
+
+```
+/plugin install juggle-break --marketplace jamiepinheiro/juggle_tracker
+```
+
+Answer `y` to add the marketplace and pick the user scope. The plugin then loads in every session,
+the desktop app's included (restart the app if it is open). `/plugin install` is a terminal command;
+the desktop app's Code tab doesn't offer it.
+
+The first break sets the camera helper up by itself, in a minute or so: the pane says
+"Setting up the camera" while it downloads the ball model, creates a Python environment with
+OpenCV and onnxruntime, and builds `Juggle Break Camera.app`. It needs:
 
 - macOS 13 or later;
-- Python 3.11+;
-- the Xcode command line tools (`xcode-select --install`, for `clang` and `codesign`);
-- `curl` and `unzip`.
+- Python 3.11 or later, or [uv](https://docs.astral.sh/uv/), which fetches its own;
+- the Xcode command line tools (`xcode-select --install`), for `clang` and `codesign`.
 
-The plugin uses the ball model from this repo's `model/` folder, so install it from a clone of the
-whole repo.
+If one is missing, the pane says which. `claude_plugin/setup.sh` does the same setup by hand.
 
-1. Run the setup script:
+### From a clone
 
-   ```bash
-   claude_plugin/setup.sh
-   ```
-
-   It does three things:
-   - Runs `model/fetch.sh`, which downloads the current ball model release into `model/releases/`.
-     `claude_plugin/model/ball.onnx` links to it.
-   - Creates `claude_plugin/.venv` with OpenCV and onnxruntime.
-   - Builds `Juggle Break Camera.app`, the small app the camera helper runs inside.
-
-   It ends with `juggle-break: helper ready`. If `fetch.sh` says there's no GitHub remote to
-   download from, set `JUGGLE_REPO=<owner>/<repo>` and run setup again.
-
-2. Check the helper runs:
-
-   ```bash
-   claude_plugin/.venv/bin/python claude_plugin/helper/juggle.py --list
-   ```
-
-   This prints a JSON line listing the cameras. Use `--video <file>` to count a video instead.
-
-3. Load the plugin. In `~/.claude/settings.json`, add the **absolute path** of this
-   `claude_plugin` folder to `CLAUDE_CODE_PLUGIN_DIRS` in the `env` block:
-
-   ```json
-   { "env": { "CLAUDE_CODE_PLUGIN_DIRS": "/absolute/path/to/juggle_tracker/claude_plugin" } }
-   ```
-
-   If `CLAUDE_CODE_PLUGIN_DIRS` already lists other folders, add this one alongside them. For a
-   single session, `claude --plugin-dir /absolute/path/to/juggle_tracker/claude_plugin` works too.
-   Restart the Claude desktop app, or start a new session, to pick it up.
-
-4. Check that it loaded: `claude plugin validate claude_plugin` should end with
-   `✔ Validation passed`. In the desktop app, `/juggle` should open the pane.
+To work on the plugin, load it from your clone instead: run `claude_plugin/setup.sh` (in a clone
+it uses the repo's `model/` folder), then add the absolute path of `claude_plugin` to
+`CLAUDE_CODE_PLUGIN_DIRS` in the `env` block of `~/.claude/settings.json`, or run
+`claude --plugin-dir <path>` for one session. Edits reload the plugin as you save.
 
 The first time the camera opens, macOS asks whether **Juggle Break Camera** may use the camera,
 and the pane says it is waiting. Your answer is remembered, and the app is listed under System

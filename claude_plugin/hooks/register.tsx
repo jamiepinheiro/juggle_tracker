@@ -104,6 +104,30 @@ async function listCameras($: $) {
   }
 }
 
+async function isSetUp($: $) {
+  const root = $.plugin.root
+  for (const path of [python($), cameraApp($), `${root}/model/ball.onnx`]) if (!(await $.fs.exists(path))) return false
+  return true
+}
+
+let settingUp: Promise<string | null> | null = null
+/** Runs setup.sh (once at a time); resolves null when the helper is ready, else why it is not. */
+function setUp($: $) {
+  settingUp ??= (async () => {
+    await log($, 'running setup.sh')
+    const r = await $.process
+      .run(['/bin/sh', `${$.plugin.root}/setup.sh`], { cwd: $.plugin.root, timeoutMs: 600_000 })
+      .catch(err => ({ exitCode: 1, stdout: '', stderr: String(err) }))
+    const last = (r.stderr.trim() || r.stdout.trim()).split('\n').pop() ?? ''
+    await log($, `setup.sh exited ${r.exitCode}: ${last}`)
+    settingUp = null
+    if (r.exitCode !== 0) return last.replace(/^juggle-break: /, '') || `setup.sh exited ${r.exitCode}`
+    void listCameras($)
+    return null
+  })()
+  return settingUp
+}
+
 async function stopHelper() {
   generation++
   const running = child
@@ -114,9 +138,16 @@ async function stopHelper() {
 async function startHelper($: $) {
   await stopHelper()
   const mine = generation
-  if (!(await $.fs.exists(python($))) || !(await $.fs.exists(cameraApp($)))) {
-    await update($, notice, () => ({ text: `The camera helper is not set up. Run ${$.plugin.root}/setup.sh once.`, isError: true }))
-    return
+  // The first break sets the helper up: the model, Python and the camera app.
+  if (!(await isSetUp($))) {
+    await update($, notice, () => ({ text: 'Setting up the camera. First time only, about a minute…', isError: false }))
+    const failed = await setUp($)
+    if (mine !== generation) return
+    if (failed) {
+      await update($, notice, () => ({ text: `Setup failed: ${failed}`, isError: true }))
+      await log($, `setup failed: ${failed}`, true)
+      return
+    }
   }
   await update($, notice, () => null)
   const { camera } = (await read($, saved)).prefs
@@ -424,9 +455,19 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // The break lasts while Claude works, background work included: a turn that leaves a command or
+  // agent running in the background ends while Claude is still busy, and that work's result starts
+  // the next turn. Stop says what is still in flight; the break ends once nothing is.
+  on('classic.Stop', async ($, e, next) => {
+    const result = await next(e)
+    if ((e.background_tasks ?? []).length === 0) await finish($, true)
+    return result
+  })
+
+  // An interrupted or failed turn raises no Stop: end the break there.
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
-    if (e.agentId === undefined) await finish($, true)
+    if (e.agentId === undefined && e.reason !== 'answer') await finish($, true)
     return done
   })
 
