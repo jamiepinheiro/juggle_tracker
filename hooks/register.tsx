@@ -63,6 +63,23 @@ async function persist($: $) {
   }
 }
 
+// Failures go to a toast and to ~/.juggle-break/log.txt (newest last), so they can be read back.
+const logLines: string[] = []
+async function log($: $, text: string, isError = false) {
+  const now = new Date().toISOString()
+  logLines.push(`${now} ${text}`)
+  if (logLines.length > 200) logLines.shift()
+  if (isError) $.ui.toast(`juggle-break: ${text}`)
+  try {
+    const path = await statsPath($)
+    const dir = path.slice(0, path.lastIndexOf('/'))
+    await $.process.run(['mkdir', '-p', dir])
+    await $.fs.write(`${dir}/log.txt`, logLines.join('\n') + '\n')
+  } catch {
+    // nowhere to write; the toast said it
+  }
+}
+
 function python($: $) {
   return `${$.plugin.root}/.venv/bin/python`
 }
@@ -95,6 +112,7 @@ async function startHelper($: $) {
   }
   await update($, error, () => null)
   const { camera } = (await read($, saved)).prefs
+  await log($, `starting helper: camera ${camera}, root ${$.plugin.root}`)
   const stream = $.process.spawn({
     argv: [python($), `${$.plugin.root}/helper/juggle.py`, '--camera', String(camera)],
     cwd: `${$.plugin.root}/helper`,
@@ -105,7 +123,10 @@ async function startHelper($: $) {
     try {
       for await (const { stream: pipe, text } of stream) {
         if (mine !== generation) break
-        if (pipe !== 'stdout') continue
+        if (pipe !== 'stdout') {
+          await log($, `helper stderr: ${text.trim().slice(0, 500)}`)
+          continue
+        }
         buffer += text
         let nl: number
         while ((nl = buffer.indexOf('\n')) >= 0) {
@@ -114,8 +135,12 @@ async function startHelper($: $) {
           if (line && mine === generation) await onMessage($, line)
         }
       }
+      if (mine === generation) await log($, 'helper exited')
     } catch (err) {
-      if (mine === generation) await update($, error, () => `Camera helper failed: ${String(err)}`)
+      if (mine === generation) {
+        await update($, error, () => `Camera helper failed: ${String(err)}`)
+        await log($, `helper failed: ${String(err)}`, true)
+      }
     }
   })()
 }
@@ -145,8 +170,12 @@ async function onMessage($: $, line: string) {
       await persist($)
       return
     }
+    case 'ready':
+      await log($, `helper ready: ${line}`)
+      return
     case 'error':
       await update($, error, () => String(msg.message))
+      await log($, `helper error: ${String(msg.message)}`, true)
       return
   }
 }
@@ -257,7 +286,8 @@ export const register: Register = on => {
 
   // A prompt starts a juggling session; one folded into a running turn changes nothing.
   on('prompt.submit', async ($, e, next) => {
-    if (e.turnId === undefined) void begin($).catch(() => undefined)
+    await log($, `prompt.submit (turnId ${e.turnId ?? 'none'})`)
+    if (e.turnId === undefined) void begin($).catch(err => log($, `could not start: ${String(err)}`, true))
     return next(e)
   })
 
