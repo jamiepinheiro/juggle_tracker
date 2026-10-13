@@ -11,7 +11,7 @@ test('the pane shows the scores and settings opens from the cog', async $ => {
     const ui = await $.ui.mount({ plugin: 'juggle-break', surface, ...PANE })
     // The desktop draws its idle message inside the black screen, which find cannot read.
     const idle = async () => surface === 'desktop' || (await ui.find({ text: /next prompt starts/ }))
-    expect(await ui.find({ text: /Record/ })).toBeDefined()
+    expect(await ui.find(surface === 'desktop' ? { key: 'cog' } : { text: /Last run/ })).toBeDefined()
     expect(await idle()).toBeTruthy()
 
     await ui.press({ key: 'cog' })

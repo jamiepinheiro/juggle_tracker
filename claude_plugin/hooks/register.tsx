@@ -301,8 +301,8 @@ function when(ms: number) {
 const ACCENT = '#FF7A45'
 const FONT = `font-family="ui-rounded, 'SF Pro Rounded', system-ui, sans-serif"`
 const NUM = `${FONT} font-weight="800" style="font-variant-numeric: tabular-nums"`
-const THEMED = `<style>.fg{fill:#f5f5f7}.dim{fill:#98989f}
-@media (prefers-color-scheme: light){.fg{fill:#1c1c1e}.dim{fill:#6e6e73}}</style>`
+const THEMED = `<style>.fg{fill:#f5f5f7}.dim{fill:#98989f}.acc{fill:${ACCENT}}
+@media (prefers-color-scheme: light){.fg{fill:#1c1c1e}.dim{fill:#6e6e73}.acc{fill:#E2531C}}</style>`
 const SHADOW = '<filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000" flood-opacity="0.6"/></filter>'
 
 function esc(text: string) {
@@ -388,14 +388,14 @@ function screenSvg(spinner: boolean, text: string | null, isError = false) {
 function countdownSvg(left: number, s: JuggleSaved, l: JuggleLive | null, now: number) {
   const W = 600
   const H = 300
-  const stat = (x: number, value: number, label: string, size = 44) =>
-    `<text x="${x}" y="236" text-anchor="middle" font-size="${size}" ${NUM} class="fg">${value}</text>` +
+  const stat = (x: number, value: number, label: string, size = 44, cls = 'fg') =>
+    `<text x="${x}" y="236" text-anchor="middle" font-size="${size}" ${NUM} class="${cls}">${value}</text>` +
     `<text x="${x}" y="264" text-anchor="middle" font-size="${size > 44 ? 18 : 16}" ${FONT} font-weight="600" class="dim">${label}</text>`
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${THEMED}` +
     `<text x="300" y="34" text-anchor="middle" font-size="22" ${FONT} font-weight="600" class="fg">Back to work in</text>` +
     `<text x="300" y="150" text-anchor="middle" font-size="120" ${NUM} class="fg">${left}</text>` +
     stat(110, l?.total ?? 0, 'Throws') +
-    stat(300, l?.sessionBest ?? 0, 'Best run', 72) +
+    stat(300, l?.sessionBest ?? 0, 'Best run', 72, 'acc') +
     stat(490, s.allTimeBest, 'Record') +
     `<text x="300" y="292" text-anchor="middle" font-size="15" ${FONT} class="dim">${count(l?.runs ?? 0, 'run')} · ${minutes(l ? now - l.startedAt : 0)} break</text></svg>`
 }
@@ -464,10 +464,9 @@ export const register: Register = on => {
         <Text dimColor>{label}</Text>
       </Box>
     )
-    // The scores, where no video carries them: Record, then the runs of this break.
+    // The runs of this break, where no video carries them.
     const scores = (
       <Box flexDirection="row" alignItems="center" gap={1}>
-        {stat('Record', s.allTimeBest, 'best')}
         {stat('Last run', l?.last ?? 0, 'last')}
         {stat('This run', l?.current ?? 0, 'current')}
         {cog}
@@ -560,8 +559,8 @@ export const register: Register = on => {
       )
     }
 
-    // The desktop: the video is the scoreboard (black with a spinner until it starts); under it,
-    // the record and settings.
+    // The desktop: the video is the scoreboard (black with a spinner until it starts); settings
+    // under it. The record waits for the end of the break.
     if (e.surface === 'desktop' && Svg) {
       const live = p === 'live'
       const screen =
@@ -577,10 +576,7 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column" gap={1}>
           {screen}
-          <Box flexDirection="row" alignItems="center">
-            <Box flexGrow={1}>
-              <Text dimColor>{`Record ${s.allTimeBest}`}</Text>
-            </Box>
+          <Box flexDirection="row" justifyContent="flex-end">
             {cog}
           </Box>
         </Box>
